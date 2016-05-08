@@ -585,14 +585,18 @@ static int rtp_parse_packet_internal(RTPDemuxContext *s, AVPacket *pkt,
 {
     unsigned int ssrc;
     int payload_type, seq, flags = 0;
-    int ext, csrc;
+    int ext, extlen, csrc;
+    uint8_t *extbuf;
     AVStream *st;
     uint32_t timestamp;
     int rv = 0;
 
-    csrc         = buf[0] & 0x0f;
-    ext          = buf[0] & 0x10;
+    csrc = buf[0] & 0x0f;
+    ext = buf[0] & 0x10;
+    extbuf = NULL;
+    extlen = 0;
     payload_type = buf[1] & 0x7f;
+    
     if (buf[1] & 0x80)
         flags |= RTP_FLAG_MARKER;
     seq       = AV_RB16(buf + 2);
@@ -635,13 +639,21 @@ static int rtp_parse_packet_internal(RTPDemuxContext *s, AVPacket *pkt,
             return -1;
         /* calculate the header extension length (stored as number
          * of 32-bit words) */
-        ext = (AV_RB16(buf + 2) + 1) << 2;
+        extlen = (AV_RB16(buf + 2) + 1) << 2;
 
-        if (len < ext)
+        if (len < extlen)
             return -1;
-        // skip past RTP header extension
-        len -= ext;
-        buf += ext;
+            
+        // Save RTP header extension data
+        if (extlen > 0) {
+            extbuf = av_malloc(extlen);
+            if (extbuf) {
+                memcpy(extbuf, buf, extlen);
+            }
+	    }
+        
+        len -= extlen;
+        buf += extlen;
     }
 
     if (s->handler && s->handler->parse_packet) {
@@ -649,14 +661,27 @@ static int rtp_parse_packet_internal(RTPDemuxContext *s, AVPacket *pkt,
                                       s->st, pkt, &timestamp, buf, len, seq,
                                       flags);
     } else if (st) {
-        if ((rv = av_new_packet(pkt, len)) < 0)
+        if ((rv = av_new_packet(pkt, len)) < 0) {
+            if (extlen > 0 && extbuf) {
+                av_free(extbuf);
+            }
             return rv;
+        }
         memcpy(pkt->data, buf, len);
         pkt->stream_index = st->index;
     } else {
+        if (extlen > 0 && extbuf) {
+            av_free(extbuf);
+        }
         return AVERROR(EINVAL);
     }
 
+    // attach ext data
+    if (extlen > 0 && extbuf) {
+        av_set_packet_ext(pkt, extbuf, extlen);
+        av_free(extbuf);
+    }
+    
     // now perform timestamp things....
     finalize_packet(s, pkt, timestamp);
 

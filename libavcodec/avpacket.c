@@ -64,6 +64,8 @@ FF_ENABLE_DEPRECATION_WARNINGS
     pkt->buf                  = NULL;
     pkt->side_data            = NULL;
     pkt->side_data_elems      = 0;
+    pkt->ext                  = NULL;
+    pkt->extlen               = 0;
 }
 
 static int packet_alloc(AVBufferRef **buf, int size)
@@ -98,6 +100,37 @@ FF_DISABLE_DEPRECATION_WARNINGS
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
 
+    return 0;
+}
+
+static void av_packet_free_ext(AVPacket *pkt)
+{
+    if (pkt->extlen > 0) {
+        if (pkt->ext) {
+            av_free(pkt->ext);
+            pkt->ext = NULL;
+        }
+        pkt->extlen = 0;
+    }
+}
+
+int av_set_packet_ext(AVPacket *pkt, uint8_t *buf, int len)
+{
+    av_packet_free_ext(pkt);
+    if (len > 0) {
+        pkt->ext = av_malloc(len);
+        pkt->extlen = len;
+        memcpy(pkt->ext, buf, len);
+    }
+    return 0;
+}
+
+static int av_copy_packet_ext(AVPacket *pkt, const AVPacket *src)
+{
+    av_packet_free_ext(pkt);
+    if (src->extlen > 0) {
+        av_set_packet_ext(pkt, src->ext, src->extlen);
+    }
     return 0;
 }
 
@@ -209,6 +242,16 @@ FF_DISABLE_DEPRECATION_WARNINGS
     pkt->destruct = dummy_destruct_packet;
 FF_ENABLE_DEPRECATION_WARNINGS
 #endif
+    
+    if (src->extlen > 0) {
+        if (dup) {
+            pkt->extlen = src->extlen;
+            pkt->ext = src->ext;
+        } else {
+            av_copy_packet_ext(pkt, src);
+        }
+    }
+    
     if (pkt->side_data_elems && dup)
         pkt->side_data = src->side_data;
     if (pkt->side_data_elems && !dup) {
@@ -294,6 +337,7 @@ FF_ENABLE_DEPRECATION_WARNINGS
         pkt->size            = 0;
 
         av_packet_free_side_data(pkt);
+        av_packet_free_ext(pkt);
     }
 }
 
@@ -528,6 +572,7 @@ int av_packet_copy_props(AVPacket *dst, const AVPacket *src)
 void av_packet_unref(AVPacket *pkt)
 {
     av_packet_free_side_data(pkt);
+    av_packet_free_ext(pkt);
     av_buffer_unref(&pkt->buf);
     av_init_packet(pkt);
     pkt->data = NULL;
@@ -552,6 +597,9 @@ int av_packet_ref(AVPacket *dst, const AVPacket *src)
 
     dst->size = src->size;
     dst->data = dst->buf->data;
+    
+    av_copy_packet_ext(dst, src);
+    
     return 0;
 fail:
     av_packet_free_side_data(dst);

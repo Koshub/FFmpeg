@@ -1178,6 +1178,13 @@ static int parse_packet(AVFormatContext *s, AVPacket *pkt, int stream_index)
             pkt->side_data          = NULL;
             pkt->side_data_elems    = 0;
         }
+        
+        if (pkt->extlen > 0) {
+            out_pkt.extlen = pkt->extlen;
+            out_pkt.ext = pkt->ext;
+            pkt->extlen = 0;
+            pkt->ext = NULL;
+        }
 
         /* set the duration */
         out_pkt.duration = 0;

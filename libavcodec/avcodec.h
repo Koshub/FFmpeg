@@ -1153,6 +1153,11 @@ typedef struct AVPacket {
     int   size;
     int   stream_index;
     /**
+     * Extension header data and size
+     */
+    uint8_t *ext;
+    int extlen;
+    /**
      * A combination of AV_PKT_FLAG values
      */
     int   flags;
@@ -3663,6 +3668,15 @@ void av_init_packet(AVPacket *pkt);
  * @return 0 if OK, AVERROR_xxx otherwise
  */
 int av_new_packet(AVPacket *pkt, int size);
+
+/**
+ * Allocate the ext data from buf with len lenght. Free prev ext data
+ *
+ * @param pkt packet
+ * @param buf buffer with ext data
+ * @param len buffer size
+ */
+int av_set_packet_ext(AVPacket *pkt, uint8_t *buf, int len);
 
 /**
  * Reduce packet size, correctly zeroing padding
