@@ -36,6 +36,10 @@ and in the [wiki](https://trac.ffmpeg.org).
 
 Coding examples are available in the **doc/examples** directory.
 
+## RTP extension header handling
+
+This repository is forked to make an ability to extract [RTP extension header](https://tools.ietf.org/html/rfc3550#section-5.3.1) data into `AVPacket`. Unfortunately it is only compatible with 2.4.2 tag. You can find complete version in [release-2.4.2 brunch](https://github.com/Koshub/FFmpeg/tree/release-2.4.2). Changes are made as a single [commit](https://github.com/Koshub/FFmpeg/commit/c7eeb33420ca6e5d3bd512f504cc90855c689438)
+
 ## License
 
 FFmpeg codebase is mainly LGPL-licensed with optional components licensed under
